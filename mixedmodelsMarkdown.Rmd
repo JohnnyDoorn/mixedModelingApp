@@ -179,7 +179,8 @@ server <- function(input, output) {
     p <- ggplot(mydatAgg(), aes(x = as.numeric(cond), y = y)) +
       # geom_boxplot(aes(group = cond), alpha = 0.5, width = 0.25) +
       # geom_line(aes(group = id, color = id), linetype = "22") +
-      geom_smooth(data = mydat(), aes(x = as.numeric(cond), color = id, fill = id), method = "lm", level = pnorm(1) - 1 + pnorm(1), alpha = 0.2) +
+      geom_smooth(data = mydat(), aes(x = as.numeric(cond), color = id, fill = id), method = "lm", 
+                  level = pnorm(1) - 1 + pnorm(1), alpha = 0.2) +
       geom_smooth(color = "black", method = "lm", level = pnorm(1) - 1 + pnorm(1), alpha = 0.4, fill = "black") +
       stat_summary(data = mydat(), geom = "pointrange", aes(color = id)) +
       # stat_summary(geom = "line", aes(group = 1), size = 1) +
