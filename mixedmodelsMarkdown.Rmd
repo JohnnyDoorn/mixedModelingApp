@@ -54,18 +54,24 @@ Y_{ijm} &\sim \mbox{N}(\alpha_i,\sigma^2)\\
 \end{aligned}
 \]
 
-
-
 Model 4, No subject-by-treatment interactions, random effect of subject and main effect of condition:
 \[
 \begin{aligned}
 Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\nu,\sigma^2)\\
-\alpha_i &\sim \mbox{N}(0,\delta_\alpha)
+\alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
 \end{aligned}
 \]
 
+Model 5, No main effect but subject-by-treatment interactions (i.e., random slopes per subject):
+\[
+\begin{aligned}
+Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\theta_i,\sigma^2)\\
+\theta_i &\sim \mbox{N}(0,\delta_\theta)\\
+\alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
+\end{aligned}
+\]
 
-Model 5, Main effect with subject-by-treatment interactions (i.e., random slopes per subject):
+Model 6, Main effect with subject-by-treatment interactions (i.e., random slopes per subject):
 \[
 \begin{aligned}
 Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j(\nu+\theta_i),\sigma^2)\\
@@ -98,15 +104,31 @@ server <- function(input, output) {
   })
   
   output$bfTable <- renderTable({
+    set.seed(input$seed)
     gbfs <- generalTestBF(y  ~ cond * id, whichRandom = c('id', 'cond:id'), 
                           data = mydat(),
                           whichModels = input$whichModels,
                           rscaleFixed = input$fixedPrior , 
                           rscaleRandom = input$randomEffectPrior, 
                           rscaleCont = 1)@bayesFactor
+    
+    if(input$whichModels == "withmain") {
+      gbf_m5 <- generalTestBF(y  ~ id + cond:id,
+                              whichRandom = c('id', 'cond:id'), 
+                              data = mydat(),
+                              whichModels = "withmain",
+                              rscaleFixed = input$fixedPrior , 
+                              rscaleRandom = input$randomEffectPrior, 
+                              rscaleCont = 1)["id + id:cond"]@bayesFactor
+    
+      gbfs <- rbind(gbfs, gbf_m5)[c("cond", "id", "cond + id", "id + id:cond", "cond + id + cond:id"), ]
+      rownames(gbfs) <- gsub("id:cond", "cond:id", rownames(gbfs))
+    }
+    
     return(data.frame(model = rownames(gbfs), 
                       logBF_intercept = gbfs[, 1], 
-                      logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id", 1])))
+                      logBF_id = gbfs[, 1] - gbfs["id", 1],
+                      logBF_id_cond = gbfs[, 1] - gbfs["id + cond:id", 1]))
     
   }, 
   caption = "Model comparison full data: Bayes factors with either Model 1 or Model 3 as the null model.", 
