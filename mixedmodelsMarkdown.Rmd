@@ -1,0 +1,214 @@
+---
+title: "Mixed Models Inventory"
+author: "Johnny van Doorn"
+runtime: shiny
+output: html_document
+---
+<style type="text/css">
+.main-container {
+max-width: 1600px;
+margin-left: auto;
+margin-right: auto;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(shiny)
+library(BayesFactor)
+library(lme4)
+library(lmerTest)
+library(afex)
+source('mixedEffectFunctions.R')
+
+```
+
+# Table of contents
+1. [Defining the Models](#defining)
+2. [Shiny App](#shiny)
+
+
+
+
+## Defining the Models <a name="defining"></a>
+Suppose $I$ people each observe $M$ trials in $J$ conditions. We have the following candidate models, each with different implications.
+
+Model 1, Weak Null, intercept ($\mu$) only:
+\[
+Y_{ijm} \sim \mbox{N}(\mu,\sigma^2)
+\]
+
+
+Model 2,  No subject effect, fixed effect ($\nu$) of condition only ($x_j=-1/2,1/2$ if $J = 2$):
+\[
+Y_{ijm} \sim \mbox{N}(\mu+x_j\nu,\sigma^2)
+\]
+
+Model 3, Strong Null, no condition effects, but random intercepts per subject (i.e., random intercept per subject):
+\[
+\begin{aligned}
+Y_{ijm} &\sim \mbox{N}(\alpha_i,\sigma^2)\\
+\alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
+\end{aligned}
+\]
+
+
+
+Model 4, No subject-by-treatment interactions, random effect of subject and main effect of condition:
+\[
+\begin{aligned}
+Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\nu,\sigma^2)\\
+\alpha_i &\sim \mbox{N}(0,\delta_\alpha)
+\end{aligned}
+\]
+
+
+Model 5, Main effect with subject-by-treatment interactions (i.e., random slopes per subject):
+\[
+\begin{aligned}
+Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j(\nu+\theta_i),\sigma^2)\\
+\theta_i &\sim \mbox{N}(0,\delta_\theta)\\
+\alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
+\end{aligned}
+\]
+
+## Shiny App  <a name="shiny"></a>
+
+```{r, echo = FALSE}
+server <- function(input, output) {
+  mydat <- reactive({
+    set.seed(input$seed)
+    myDataSim(fixedEffectItem = input$fixedEffectItem, randomSlopeItemSigma = input$randSlopeItem,
+              randomInterceptItemSigma = input$randInterItem,
+              fixedEffectCondition = input$fixedEffectCond, randomSlopeConditionSigma = input$randSlopeCond,
+              randomInterceptConditionSigma = input$randInterCond, errorSigma = input$errorSig,
+              randomRhoSlopeInterceptCondition = input$rhoEffectsCondition, 
+              randomRhoSlopeInterceptItem = input$rhoEffectsItem, 
+              errorSigBetween = 0,
+              nSub = input$nSub, nItem = input$nItem, nCond = input$nCond)})
+  
+  output$bfTable <- renderTable({
+    gbfs <- generalTestBF(y  ~ cond * id, whichRandom = c('id', 'cond:id'), data = mydat(),
+                          whichModels = input$whichModels,
+                          rscaleFixed = input$fixedPrior , rscaleRandom = input$randomEffectPrior, 
+                          rscaleCont = 1)@bayesFactor
+    return(data.frame(model = rownames(gbfs), logBF_intercept = gbfs[, 1], logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id",1])))
+    # return(data.frame(logBF_intercept = 1:4))#, logBF_id = c(NA, 0, allbf)))
+    
+  }, caption = "Model comparison full data: Bayes factors with either Model 1 or Model 3 as the null model.", striped = TRUE)
+  
+  output$bfTableAgg <- renderTable({
+    dat <- mydat()
+    mydatAgg <- as.data.frame.table(tapply(dat$y,list(dat$id,dat$cond),mean)) # same as mydatUnivar
+    colnames(mydatAgg)=c("id","cond", "y")
+    
+    gbfs <- generalTestBF(y  ~ cond * id, whichRandom = c('id', 'cond:id'), data = mydatAgg, 
+                          whichModels = input$whichModels, rscaleFixed = input$fixedPriorAgg , 
+                          rscaleRandom = input$randomEffectPriorAgg, 
+                          rscaleCont = 1)@bayesFactor
+    return(data.frame(model = rownames(gbfs), logBF_intercept = gbfs[, 1], logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id",1])))
+  }, caption = "Model comparison aggregated data: Bayes factors with either Model 1 or Model 3 as the null model.", striped = TRUE)
+  
+  output$linesPlot <- renderPlot({
+    mylwd <- 2
+    dat <- mydat()
+    mydatAgg <- as.data.frame.table(tapply(dat$y,list(dat$id,dat$cond),mean)) 
+    colnames(mydatAgg)=c("id","cond", "y")
+    
+    par(mfrow = c(1, 2), cex = 1.2)
+    palette(rainbow(input$nSub))
+    allCols <- adjustcolor(palette(), alpha.f = 0.4)
+    plot(dat$cond, dat$y, bty = "n", las = 1, type ="n", xlab = "Condition", ylab = "y", main = "Full Data")
+    
+    points(as.numeric(dat$cond), dat$y)
+    for (i in 1:input$nSub) {
+      ss <- subset(dat, id == i)
+      for (j in 1:input$nItem) {
+        sss <- subset(ss, item == j)
+        lines(1:input$nCond, sss$y, col = allCols[i], lwd = mylwd)
+      }
+    }
+    
+    boxplot(dat$y ~ dat$cond, bty = "n", las = 1, type ="n", xlab = "Condition", ylab = "y", main = "Aggregated Data", 
+            col = "white", border = "white", bg = "white")
+    boxplot(mydatAgg$y ~ mydatAgg$cond, add = TRUE, las = 1)
+    points(as.numeric(mydatAgg$cond), mydatAgg$y)
+    for (i in 1:input$nSub) {
+      ss <- subset(mydatAgg, id == i)
+      lines(1:input$nCond, tapply(ss$y, ss$cond, mean), col = allCols[i], lwd = mylwd)
+    }
+    
+  })
+  
+  output$data <- downloadHandler(
+    filename = function() {
+      paste('mixedEffectsData_', Sys.Date(), '.csv', sep='')
+    },
+    content = function(con) {
+      write.csv(mydat(), con)
+    }
+  )
+}
+
+ui <- fluidPage (
+  
+  sidebarLayout(            
+    sidebarPanel(
+      fluidRow(
+        column(10,                
+               numericInput('seed', "Set seed", value = 123, min = 1, step = 1),
+               downloadButton(outputId = 'data', label = "Download data"),
+               radioButtons("whichModels", "Which Models?", choices = c("withmain", "all"), selected = "withmain")
+        ),        
+        column(6,
+               sliderInput('nSub', '#sub', value = 10, min = 2, max = 100, step = 1),
+               sliderInput('nCond', '#condition', value = 2, min = 2, max = 10, step = 1),
+               sliderInput('fixedEffectCond', 'Fixed effect cond', value = 0, min = 0, max = 3, step = 0.1),
+               sliderInput('randSlopeCond', 'Random slope cond sigma', value = 0, min = 0, max = 3, step = 0.1),
+               sliderInput('randInterCond', 'Random intercept cond sigma', value = 0, min = 0, max = 3, 
+                           step = 0.1),
+               sliderInput('rhoEffectsCondition', 'Rho intercept/slope cond', value = 0, min = -1, max = 1, 
+                           step = 0.1)
+        ),
+        column(6,
+               sliderInput('errorSig', 'Error sigma', value = 1, min = 0, max = 10, step = 0.1),
+               sliderInput('nItem', '#item', value = 2, min = 1, max = 100, step = 1),
+               sliderInput('fixedEffectItem', 'Fixed effect item', value = 0, min = 0, max = 3, step = 0.1),
+               sliderInput('randSlopeItem', 'Random slope item sigma', value = 0, min = 0, max = 3, step = 0.1),
+               sliderInput('randInterItem', 'Random intercept item sigma', value = 0, min = 0, max = 3, 
+                           step = 0.1),
+               sliderInput('rhoEffectsItem', 'Rho intercept/slope item', value = 0, min = -1, max = 1, 
+                           step = 0.1)
+        ),
+        column(6,
+               sliderInput('fixedPrior', 'Prior width fixed effect (full)', value = 0.2, min = 0.1, max = 3, step = 0.1),
+               sliderInput('randomEffectPrior', 'Prior random effects (full)', value = 1, min = 0.1, max = 3, step = 0.1),
+        ),
+        column(6, 
+               sliderInput('fixedPriorAgg', 'Prior width fixed effect (agg)', value = 0.2, min = 0.1, max = 3, step = 0.1),
+               sliderInput('randomEffectPriorAgg', 'Prior random effects (agg)', value = 1, min = 0.1, max = 3, step = 0.1)
+               
+        )
+      )),
+    
+    mainPanel(
+      plotOutput("linesPlot"),
+      fluidRow(
+        column(6, tableOutput("bfTable")),
+        column(6, tableOutput("bfTableAgg"))),
+      
+      tags$head(tags$style(HTML("
+                               body {
+                                  width: 100% !important;
+                                  max-width: 120% !important;
+                               }
+
+                               ")))
+    )
+  )
+)
+shinyApp(ui, server, options = list(width = "100%", height = 1000))
+```
+
+
