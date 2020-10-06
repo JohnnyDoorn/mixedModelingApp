@@ -20,6 +20,7 @@ library(BayesFactor)
 library(lme4)
 library(lmerTest)
 library(afex)
+library(ggplot2)
 source('mixedEffectFunctions.R')
 
 ```
@@ -153,6 +154,49 @@ server <- function(input, output) {
     
   })
   
+  output$ggPlotAgg <- renderPlot({
+    p <- ggplot(mydatAgg(), aes(x = as.numeric(cond), y = y)) +
+      # geom_boxplot(aes(group = cond), alpha = 0.5, width = 0.25) +
+      geom_line(aes(group = id, color = id)) +
+      geom_point(aes(color = id), size = 2.5) +
+      geom_smooth(color = "black", method = "lm", level = pnorm(1) - 1 + pnorm(1), alpha = 0.4, fill = "black") +
+      stat_summary(geom = "pointrange", color = "black", size = 0.8) +
+      # stat_summary(geom = "line", aes(group = 1), size = 1) +
+      # facet_wrap(~ level, ncol = 2) +
+      guides(color = FALSE, fill = FALSE) +
+      scale_x_continuous(breaks = round, expand = expansion(add = 0.25)) +
+      labs(x = "Condition", y = "y") +
+      theme_bw(base_size = 18) +
+      theme(
+        panel.grid.major = element_blank()
+        , panel.grid.minor = element_blank()
+      )
+    
+    print(p)
+  })
+  
+  output$ggPlot <- renderPlot({
+    p <- ggplot(mydatAgg(), aes(x = as.numeric(cond), y = y)) +
+      # geom_boxplot(aes(group = cond), alpha = 0.5, width = 0.25) +
+      # geom_line(aes(group = id, color = id), linetype = "22") +
+      geom_smooth(data = mydat(), aes(x = as.numeric(cond), color = id, fill = id), method = "lm", level = pnorm(1) - 1 + pnorm(1), alpha = 0.2) +
+      geom_smooth(color = "black", method = "lm", level = pnorm(1) - 1 + pnorm(1), alpha = 0.4, fill = "black") +
+      stat_summary(data = mydat(), geom = "pointrange", aes(color = id)) +
+      # stat_summary(geom = "line", aes(group = 1), size = 1) +
+      stat_summary(geom = "pointrange", size = 0.8) +
+      # facet_wrap(~ level, ncol = 2) +
+      guides(color = FALSE, fill = FALSE) +
+      scale_x_continuous(breaks = round, expand = expansion(add = 0.25)) +
+      labs(x = "Condition", y = "y") +
+      theme_bw(base_size = 18) +
+      theme(
+        panel.grid.major = element_blank()
+        , panel.grid.minor = element_blank()
+      )
+    
+    print(p)
+  })
+  
   output$data <- downloadHandler(
     filename = function() {
       paste('mixedEffectsData_', Sys.Date(), '.csv', sep='')
@@ -209,6 +253,9 @@ ui <- fluidPage (
       fluidRow(
         column(6, tableOutput("bfTable")),
         column(6, tableOutput("bfTableAgg"))),
+      fluidRow(
+        column(6, plotOutput("ggPlot")),
+        column(6, plotOutput("ggPlotAgg"))),
       
       tags$head(tags$style(HTML("
                                body {
