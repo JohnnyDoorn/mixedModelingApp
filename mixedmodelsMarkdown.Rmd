@@ -1,6 +1,6 @@
 ---
 title: "Mixed Models Inventory"
-author: "Johnny van Doorn"
+author: "Johnny van Doorn, Frederik Aust, Julia Haaf, Angelika Stefan, EJ Wagenmakers"
 runtime: shiny
 output: html_document
 ---
@@ -86,56 +86,68 @@ server <- function(input, output) {
               randomRhoSlopeInterceptCondition = input$rhoEffectsCondition, 
               randomRhoSlopeInterceptItem = input$rhoEffectsItem, 
               errorSigBetween = 0,
-              nSub = input$nSub, nItem = input$nItem, nCond = input$nCond)})
+              nSub = input$nSub, nItem = input$nItem, nCond = input$nCond)
+  })
+  
+  mydatAgg <- reactive({
+    dat <- mydat()
+    mydatAgg <- as.data.frame.table(tapply(dat$y,list(dat$id,dat$cond),mean))
+    colnames(mydatAgg)=c("id","cond", "y")
+    return(mydatAgg)
+  })
   
   output$bfTable <- renderTable({
-    gbfs <- generalTestBF(y  ~ cond * id, whichRandom = c('id', 'cond:id'), data = mydat(),
+    gbfs <- generalTestBF(y  ~ cond * id, whichRandom = c('id', 'cond:id'), 
+                          data = mydat(),
                           whichModels = input$whichModels,
-                          rscaleFixed = input$fixedPrior , rscaleRandom = input$randomEffectPrior, 
+                          rscaleFixed = input$fixedPrior , 
+                          rscaleRandom = input$randomEffectPrior, 
                           rscaleCont = 1)@bayesFactor
-    return(data.frame(model = rownames(gbfs), logBF_intercept = gbfs[, 1], logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id",1])))
-    # return(data.frame(logBF_intercept = 1:4))#, logBF_id = c(NA, 0, allbf)))
+    return(data.frame(model = rownames(gbfs), 
+                      logBF_intercept = gbfs[, 1], 
+                      logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id", 1])))
     
-  }, caption = "Model comparison full data: Bayes factors with either Model 1 or Model 3 as the null model.", striped = TRUE)
+  }, 
+  caption = "Model comparison full data: Bayes factors with either Model 1 or Model 3 as the null model.", 
+  striped = TRUE)
   
   output$bfTableAgg <- renderTable({
-    dat <- mydat()
-    mydatAgg <- as.data.frame.table(tapply(dat$y,list(dat$id,dat$cond),mean)) # same as mydatUnivar
-    colnames(mydatAgg)=c("id","cond", "y")
-    
-    gbfs <- generalTestBF(y  ~ cond * id, whichRandom = c('id', 'cond:id'), data = mydatAgg, 
-                          whichModels = input$whichModels, rscaleFixed = input$fixedPriorAgg , 
+    gbfs <- generalTestBF(y  ~ cond * id, whichRandom = c('id', 'cond:id'), 
+                          data = mydatAgg(), 
+                          whichModels = input$whichModels, 
+                          rscaleFixed = input$fixedPriorAgg , 
                           rscaleRandom = input$randomEffectPriorAgg, 
                           rscaleCont = 1)@bayesFactor
-    return(data.frame(model = rownames(gbfs), logBF_intercept = gbfs[, 1], logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id",1])))
-  }, caption = "Model comparison aggregated data: Bayes factors with either Model 1 or Model 3 as the null model.", striped = TRUE)
+    return(data.frame(model = rownames(gbfs), 
+                      logBF_intercept = gbfs[, 1], 
+                      logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id", 1])))
+  }, 
+  caption = "Model comparison aggregated data: Bayes factors with either Model 1 or Model 3 as the null model.", 
+  striped = TRUE)
   
   output$linesPlot <- renderPlot({
     mylwd <- 2
-    dat <- mydat()
-    mydatAgg <- as.data.frame.table(tapply(dat$y,list(dat$id,dat$cond),mean)) 
-    colnames(mydatAgg)=c("id","cond", "y")
-    
     par(mfrow = c(1, 2), cex = 1.2)
     palette(rainbow(input$nSub))
     allCols <- adjustcolor(palette(), alpha.f = 0.4)
-    plot(dat$cond, dat$y, bty = "n", las = 1, type ="n", xlab = "Condition", ylab = "y", main = "Full Data")
+    plot(mydat()$cond, mydat()$y, bty = "n", las = 1, type ="n", xlab = "Condition", ylab = "y", main = "Full Data")
     
-    points(as.numeric(dat$cond), dat$y)
+    points(as.numeric(mydat()$cond), mydat()$y)
     for (i in 1:input$nSub) {
-      ss <- subset(dat, id == i)
+      ss <- subset(mydat(), id == i)
       for (j in 1:input$nItem) {
         sss <- subset(ss, item == j)
         lines(1:input$nCond, sss$y, col = allCols[i], lwd = mylwd)
       }
     }
     
-    boxplot(dat$y ~ dat$cond, bty = "n", las = 1, type ="n", xlab = "Condition", ylab = "y", main = "Aggregated Data", 
+    boxplot(mydat()$y ~ mydat()$cond, bty = "n", las = 1, type ="n", 
+            xlab = "Condition", ylab = "y", main = "Aggregated Data", 
             col = "white", border = "white", bg = "white")
-    boxplot(mydatAgg$y ~ mydatAgg$cond, add = TRUE, las = 1)
-    points(as.numeric(mydatAgg$cond), mydatAgg$y)
+    boxplot(mydatAgg()$y ~ mydatAgg()$cond, add = TRUE, las = 1)
+    points(as.numeric(mydatAgg()$cond), mydatAgg()$y)
     for (i in 1:input$nSub) {
-      ss <- subset(mydatAgg, id == i)
+      ss <- subset(mydatAgg(), id == i)
       lines(1:input$nCond, tapply(ss$y, ss$cond, mean), col = allCols[i], lwd = mylwd)
     }
     
@@ -208,6 +220,7 @@ ui <- fluidPage (
     )
   )
 )
+
 shinyApp(ui, server, options = list(width = "100%", height = 1000))
 ```
 

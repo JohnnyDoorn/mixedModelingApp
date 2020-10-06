@@ -8,6 +8,7 @@ library(lmerTest)
 myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInterceptItemSigma = 0, randomRhoSlopeInterceptItem = 0,
                       fixedEffectCondition = 0, randomSlopeConditionSigma = 0, randomInterceptConditionSigma = 0, randomRhoSlopeInterceptCondition = 0,
                       errorSigma = 1, errorSigBetween = 0, nSub = 30, nItem = 2, nCond = 2) {
+  
   I <- nSub # n per item per condition
   id <- 1:I
   intercept <- 0
@@ -29,17 +30,15 @@ myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInter
   randomEffectMatCondition[1, 2] <- randomEffectMatCondition[2, 1] <- randomRhoSlopeInterceptCondition * sqrt(randomInterceptConditionSigma) * sqrt(randomSlopeConditionSigma)
   
   err <- rnorm(grandN, 0, errorSigma)
-  # withinErr <- grandN/I
-  betweenErr <- rnorm(I, 0, errorSigBetween)
-  
+
   randomEffectsItem <- mvrnorm(n = I, mu = c(0,0) , Sigma = randomEffectMatItem)
   randomEffectsCondition <- mvrnorm(n = I, mu = c(0,0) , Sigma = randomEffectMatCondition)
   colnames(randomEffectsItem) <- colnames(randomEffectsCondition) <- c("intercept", "slope")
   
   y <- intercept + randomEffectsItem[,"intercept"][id] + randomEffectsCondition[,"intercept"][id] +
     (fixedEffectCondition + randomEffectsCondition[,"slope"][id]) * fixedEffectConditionVector[cond] +
-    (fixedEffectItem + randomEffectsItem[,"slope"][id]) * fixedEffectItemVector[item] +  
-    betweenErr[id] + err
+    (fixedEffectItem + randomEffectsItem[,"slope"][id]) * fixedEffectItemVector[item] + err
+  
   mydat <- data.frame(y = y,
                       cond = as.factor(cond),
                       item = as.factor(item),
@@ -47,19 +46,6 @@ myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInter
   return(mydat)
 }
 
-
-jeffDataSim=function(t.theta.m=.1,t.theta.sig=0){
-  sub=rep(1:I,each=J*M)
-  cond=rep(rep(1:J,each=M),I)
-  t.alpha=rnorm(I,0,1)
-  t.theta=rnorm(I,t.theta.m,t.theta.sig)
-  t.sigma=1
-  cellmean=t.alpha[sub]+(cond-3/2)*t.theta[sub]
-  y=rnorm(I*J*M,cellmean,t.sigma)
-  dat=data.frame(as.factor(sub),as.factor(cond),y)
-  colnames(dat)=c("id","cond","y")
-  return(dat)
-}
 
 compute4BF=function(dat){
   y=dat$y
