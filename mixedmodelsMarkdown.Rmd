@@ -38,7 +38,7 @@ Y_{ijm} \sim \mbox{N}(\mu,\sigma\epsilon^2)
 \]
 
 
-Model 2)  Fixed effect $\nu$ of condition, which is the same for all participants. The term $x_j$  indicates the specific condition (i.e., $x_j= -\nicefrac{1}{2},\nicefrac{1}{2}$ if $J = 2$), which ensures the sums-to-zero constraint.
+Model 2)  Fixed effect $\nu$ of condition, which is the same for all participants. The term $x_j$  indicates the specific condition (i.e., $x_j= -1/2, 1/2$ if $J = 2$), which ensures the sums-to-zero constraint.
 \[
 Y_{ijm} \sim \mbox{N}(\mu+x_j\nu,\sigma\epsilon^2)
 \]
