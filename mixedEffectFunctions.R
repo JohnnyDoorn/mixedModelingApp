@@ -31,8 +31,8 @@ myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInter
   
   err <- rnorm(grandN, 0, errorSigma)
 
-  randomEffectsItem <- mvrnorm(n = I, mu = c(0,0) , Sigma = randomEffectMatItem)
-  randomEffectsCondition <- mvrnorm(n = I, mu = c(0,0) , Sigma = randomEffectMatCondition)
+  randomEffectsItem <- MASS::mvrnorm(n = I, mu = c(0,0) , Sigma = randomEffectMatItem)
+  randomEffectsCondition <- MASS::mvrnorm(n = I, mu = c(0,0) , Sigma = randomEffectMatCondition)
   colnames(randomEffectsItem) <- colnames(randomEffectsCondition) <- c("intercept", "slope")
   
   y <- intercept + randomEffectsItem[, "intercept"][id] + randomEffectsCondition[, "intercept"][id] +
@@ -47,37 +47,80 @@ myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInter
 }
 
 
-plotBoxplotLines <- function(mydat) {
-  par(mfrow = c(1, 2), cex = 1.2)
+plotBoxplotLines <- function(mydat, xlab = "Condition", ylab = "y", myCex = 1.3, myCexLab  = 1.3,
+                             mylwd = 2, myAlpha = 0.4) {
+  par(mfrow = c(1, 2), cex = myCex, cex.lab  = myCexLab, cex.main = myCexLab)
   mydatAgg <- as.data.frame.table(tapply(mydat$y,list(mydat$id,mydat$cond),mean))
   colnames(mydatAgg)=c("id","cond", "y")
   
-  mylwd <- 2
   nCond <- nlevels(mydat$cond)
   nItem <- nlevels(mydat$item)
   nSub <- nlevels(mydat$id)
   palette(rainbow(nSub))
-  allCols <- adjustcolor(palette(), alpha.f = 0.4)
-  plot(mydat$cond, mydat$y, bty = "n", las = 1, type ="n", xlab = "Condition", ylab = "y", main = "Full Data")
+  allCols <- adjustcolor(palette(), alpha.f = myAlpha)
+  plot(mydat$cond, mydat$y, bty = "n", las = 1, type ="n", xlab = xlab, ylab = ylab, main = "Full Data")
   
   points(as.numeric(mydat$cond), mydat$y)
   for (i in 1:nSub) {
-    ss <- subset(mydat, id == i)
+    ss <- subset(mydat, id == levels(mydat$id)[i])
     for (j in 1:nItem) {
-      sss <- subset(ss, item == j)
+      sss <- subset(ss, item == levels(mydat$item)[j])
       lines(1:nCond, sss$y, col = allCols[i], lwd = mylwd)
     }
   }
   
-  boxplot(mydat$y ~ mydat$cond, bty = "n", las = 1, type ="n", 
-          xlab = "Condition", ylab = "y", main = "Aggregated Data", 
-          col = "white", border = "white", bg = "white")
+  plot(mydat$y ~ mydat$cond, bty = "n", las = 1, type ="n", 
+          xlab = xlab, ylab = ylab, main = "Aggregated Data")
   boxplot(mydatAgg$y ~ mydatAgg$cond, add = TRUE, las = 1)
   points(as.numeric(mydatAgg$cond), mydatAgg$y)
   for (i in 1:nSub) {
-    ss <- subset(mydatAgg, id == i)
+    ss <- subset(mydatAgg, id == levels(mydat$id)[i])
     lines(1:nCond, tapply(ss$y, ss$cond, mean), col = allCols[i], lwd = mylwd)
   }
 }
 
+
+
+analyzeSamples <- function(nSub, nItem, nCond, fixEffect, errorSigma, randInterSigma, randSlopeSigma) {
+  afex::set_sum_contrasts()
+  allBfAgg <- allBf <- AIClmer <- AIClmerAgg <- data.frame(rInter = NA, rInterCond = NA, rSlopInter = NA, full = NA)
+
+  mydat <- myDataSim(nSub = nSub, nItem = nItem, nCond = nCond, fixedEffectCondition = fixEffect, 
+                     errorSigma = errorSigma, randomInterceptConditionSigma = randInterSigma,
+                     randomSlopeConditionSigma = randSlopeSigma)
+  mydatAgg <- as.data.frame.table(tapply(mydat$y,list(mydat$id,mydat$cond),mean)) # same as mydatUnivar
+  colnames(mydatAgg)=c("id","cond", "y")
+  
+  bfs <- BayesFactor::generalTestBF(y ~ cond*id, mydat, whichRandom = c('id'), whichModels = 'all')
+  idbf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "id"]
+  condbf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "cond + id"]
+  ranSlopeBf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "id + cond:id"]
+  fullBf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "cond + id + cond:id"]
+  allBf[1, ] <- c(idbf, condbf, ranSlopeBf, fullBf) 
+  
+  bfs <- BayesFactor::generalTestBF(y ~ cond*id, mydatAgg, whichRandom = c('id'), whichModels = 'all')
+  idbf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "id"]
+  condbf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "cond + id"]
+  ranSlopeBf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "id + cond:id"]
+  fullBf <- bfs@bayesFactor$bf[rownames(bfs@bayesFactor) == "cond + id + cond:id"]
+  allBfAgg[1, ] <- c(idbf, condbf, ranSlopeBf, fullBf) 
+  
+  fullMod <- lmerTest::lmer(y ~ cond + (cond | id), data = mydat)
+  ranSlope <- lmerTest::lmer(y ~ (cond | id), data = mydat)
+  condId <- lmerTest::lmer(y ~ cond + (1 | id), data = mydat)
+  idOnly <- lmerTest::lmer(y ~ (1 | id), data = mydat)
+  AIClmer[1, ] <- AIC(idOnly, condId, ranSlope, fullMod)[,2]
+  
+  baseModPval <- summary(condId)$coefficients["cond2", "Pr(>|t|)"]
+  fullModPval <- summary(fullMod)$coefficients["cond2", "Pr(>|t|)"]
+  
+  condId <- lmerTest::lmer(y ~ cond + (1 | id), data = mydatAgg)
+  idOnly <- lmerTest::lmer(y ~ (1 | id), data = mydatAgg)
+  AIClmerAgg[1, ] <- c(AIC(idOnly, condId)[,2], NA, NA)
+  
+  baseModPvalAgg <- summary(condId)$coefficients["cond2", "Pr(>|t|)"]
+  
+  return(list(allBfAgg = allBfAgg, allBf = allBf, AIClmer = AIClmer, AIClmerAgg = AIClmerAgg, 
+              fullModPval = fullModPval, baseModPval = baseModPval, baseModPvalAgg = baseModPvalAgg))
+}
 

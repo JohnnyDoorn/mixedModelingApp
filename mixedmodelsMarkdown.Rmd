@@ -29,52 +29,49 @@ source('mixedEffectFunctions.R')
 1. [Defining the Models](#defining)
 2. [Shiny App](#shiny)
 
-
-
-
 ## Defining the Models <a name="defining"></a>
 Suppose $I$ people each observe $M$ trials in $J$ conditions. We have the following candidate models, each with different implications.
 
-Model 1, Weak Null, intercept ($\mu$) only:
+Model 1) Intercept ($\mu$) only, there are no differences across conditions and participants.
 \[
-Y_{ijm} \sim \mbox{N}(\mu,\sigma^2)
+Y_{ijm} \sim \mbox{N}(\mu,\sigma\epsilon^2)
 \]
 
 
-Model 2,  No subject effect, fixed effect ($\nu$) of condition only ($x_j=-1/2,1/2$ if $J = 2$):
+Model 2)  Fixed effect $\nu$ of condition, which is the same for all participants. The term $x_j$  indicates the specific condition (i.e., $x_j= -\nicefrac{1}{2},\nicefrac{1}{2}$ if $J = 2$), which ensures the sums-to-zero constraint.
 \[
-Y_{ijm} \sim \mbox{N}(\mu+x_j\nu,\sigma^2)
+Y_{ijm} \sim \mbox{N}(\mu+x_j\nu,\sigma\epsilon^2)
 \]
 
-Model 3, Strong Null, no condition effects, but random intercepts per subject (i.e., random intercept per subject):
+Model 3) No fixed effect of condition, but individual differences in baseline. The random intercepts are denoted with $\alpha_i$, where the subscript indicates that the intercepts are specific to each participant. The random intercepts vary around the intercept $\mu$, with standard deviation $\sigma_\alpha$. Such random intercepts can also be seen as a main effect of participant.  When $\sigma_\alpha$ is set to 0, Model \ref{eqn:mod3} is equivalent to Model \ref{eqn:mod1}. In one-way RM ANOVA, this model is typically used as the null model.
 \[
 \begin{aligned}
-Y_{ijm} &\sim \mbox{N}(\alpha_i,\sigma^2)\\
+Y_{ijm} &\sim \mbox{N}(\alpha_i,\sigma\epsilon^2)\\
 \alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
 \end{aligned}
 \]
 
-Model 4, No subject-by-treatment interactions, random effect of subject and main effect of condition:
+Model 4) Fixed effect of condition and individual differences in baseline. This is typically used as the alternative model in one-way RM ANOVA.
 \[
 \begin{aligned}
-Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\nu,\sigma^2)\\
+Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\nu,\sigma\epsilon^2)\\
 \alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
 \end{aligned}
 \]
 
-Model 5, No main effect but subject-by-treatment interactions (i.e., random slopes per subject):
+Model 5) No fixed effect, but  individual differences in baseline and effect of condition (i.e., random intercepts and slopes per subject). The random slopes are denoted with $\theta_i$, where the subscript indicates that the slopes are specific to each participant. The random slopes vary around $0$, with standard deviation $\sigma_\theta$. Such random slopes can also be seen as an interaction effect between condition and participant.  When $\sigma_\theta$ is set to 0, Model \ref{eqn:mod5} is equivalent to Model \ref{eqn:mod3}.
 \[
 \begin{aligned}
-Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\theta_i,\sigma^2)\\
+Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\theta_i,\sigma\epsilon^2)\\
 \theta_i &\sim \mbox{N}(0,\delta_\theta)\\
 \alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
 \end{aligned}
 \]
 
-Model 6, Main effect with subject-by-treatment interactions (i.e., random slopes per subject):
+Model 6)  The full model, with fixed effect of condition random intercepts, and random slopes. Note that all previous models are subsets of this model.
 \[
 \begin{aligned}
-Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j(\nu+\theta_i),\sigma^2)\\
+Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j(\nu+\theta_i),\sigma_\epsilon^2)\\
 \theta_i &\sim \mbox{N}(0,\delta_\theta)\\
 \alpha_i &\sim \mbox{N}(\mu,\delta_\alpha)
 \end{aligned}
