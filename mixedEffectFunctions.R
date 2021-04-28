@@ -3,11 +3,12 @@ library(lme4)
 library(BayesFactor)
 library(afex)
 library(lmerTest)
-# library(BFEffects)
 
 myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInterceptItemSigma = 0, randomRhoSlopeInterceptItem = 0,
                       fixedEffectCondition = 0, randomSlopeConditionSigma = 0, randomInterceptConditionSigma = 0, randomRhoSlopeInterceptCondition = 0,
                       errorSigma = 1, errorSigBetween = 0, nSub = 30, nItem = 2, nCond = 2) {
+  
+  if (nCond > 2) stop("Function currently only works for 2 conditions.")
   
   I <- nSub # n per item per condition
   id <- 1:I
@@ -19,9 +20,8 @@ myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInter
   cond <- rep(1:J, each = M*I)
   item <- rep(1:M, J*I)
   id <- rep(rep(1:I, each = M), J)
-  fixedEffectConditionVector <- seq(-1/nCond, 1/nCond, length.out = nCond) 
-  fixedEffectItemVector <- seq(-1/nItem, 1/nItem, length.out = nItem) 
-  
+  fixedEffectConditionVector <- c(-0.5, 0.5)
+
   # setup random effects  
   randomEffectMatItem <- diag(c(randomInterceptItemSigma, randomSlopeItemSigma))
   randomEffectMatItem[1, 2] <- randomEffectMatItem[2, 1] <- randomRhoSlopeInterceptItem * sqrt(randomInterceptItemSigma) * sqrt(randomSlopeItemSigma)
@@ -37,7 +37,7 @@ myDataSim <- function(fixedEffectItem = 0, randomSlopeItemSigma = 0, randomInter
   
   y <- intercept + randomEffectsItem[, "intercept"][id] + randomEffectsCondition[, "intercept"][id] +
     (fixedEffectCondition + randomEffectsCondition[, "slope"][id]) * fixedEffectConditionVector[cond] +
-    (fixedEffectItem + randomEffectsItem[, "slope"][id]) * fixedEffectItemVector[item] + err
+    err
   
   mydat <- data.frame(y = y,
                       cond = as.factor(cond),
