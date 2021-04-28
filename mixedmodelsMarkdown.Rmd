@@ -32,18 +32,18 @@ source('mixedEffectFunctions.R')
 ## Defining the Models <a name="defining"></a>
 Suppose $I$ people each observe $M$ trials in $J$ conditions. We have the following candidate models, each with different implications.
 
-Model 1) Intercept ($\mu$) only, there are no differences across conditions and participants.
+Model 1) Intercept ($\mu$) only, there are no differences across conditions and subjects.
 \[
 Y_{ijm} \sim \mbox{N}(\mu,\sigma\epsilon^2)
 \]
 
 
-Model 2)  Fixed effect $\nu$ of condition, which is the same for all participants. The term $x_j$  indicates the specific condition (i.e., $x_j= -1/2, 1/2$ if $J = 2$), which ensures the sums-to-zero constraint.
+Model 2)  Fixed effect $\nu$ of condition, which is the same for all subjects. The term $x_j$  indicates the specific condition (i.e., $x_j= -1/2, 1/2$ if $J = 2$), which ensures the sums-to-zero constraint.
 \[
 Y_{ijm} \sim \mbox{N}(\mu+x_j\nu,\sigma\epsilon^2)
 \]
 
-Model 3) No fixed effect of condition, but individual differences in baseline. The random intercepts are denoted with $\alpha_i$, where the subscript indicates that the intercepts are specific to each participant. The random intercepts vary around the intercept $\mu$, with standard deviation $\sigma_\alpha$. Such random intercepts can also be seen as a main effect of participant.  When $\sigma_\alpha$ is set to 0, Model \ref{eqn:mod3} is equivalent to Model \ref{eqn:mod1}. In one-way RM ANOVA, this model is typically used as the null model.
+Model 3) No fixed effect of condition, but individual differences in baseline. The random intercepts are denoted with $\alpha_i$, where the subscript indicates that the intercepts are specific to each subject. The random intercepts vary around the intercept $\mu$, with standard deviation $\sigma_\alpha$. Such random intercepts can also be seen as a main effect of subject.  When $\sigma_\alpha$ is set to 0, Model \ref{eqn:mod3} is equivalent to Model \ref{eqn:mod1}. In one-way RM ANOVA, this model is typically used as the null model.
 \[
 \begin{aligned}
 Y_{ijm} &\sim \mbox{N}(\alpha_i,\sigma\epsilon^2)\\
@@ -59,7 +59,7 @@ Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\nu,\sigma\epsilon^2)\\
 \end{aligned}
 \]
 
-Model 5) No fixed effect, but  individual differences in baseline and effect of condition (i.e., random intercepts and slopes per subject). The random slopes are denoted with $\theta_i$, where the subscript indicates that the slopes are specific to each participant. The random slopes vary around $0$, with standard deviation $\sigma_\theta$. Such random slopes can also be seen as an interaction effect between condition and participant.  When $\sigma_\theta$ is set to 0, Model \ref{eqn:mod5} is equivalent to Model \ref{eqn:mod3}.
+Model 5) No fixed effect, but  individual differences in baseline and effect of condition (i.e., random intercepts and slopes per subject). The random slopes are denoted with $\theta_i$, where the subscript indicates that the slopes are specific to each subject. The random slopes vary around $0$, with standard deviation $\sigma_\theta$. Such random slopes can also be seen as an interaction effect between condition and subject.  When $\sigma_\theta$ is set to 0, Model \ref{eqn:mod5} is equivalent to Model \ref{eqn:mod3}.
 \[
 \begin{aligned}
 Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j\theta_i,\sigma\epsilon^2)\\
@@ -83,14 +83,14 @@ Y_{ijm} &\sim \mbox{N}(\alpha_i+x_j(\nu+\theta_i),\sigma_\epsilon^2)\\
 server <- function(input, output) {
   mydat <- reactive({
     set.seed(input$seed)
-    myDataSim(fixedEffectItem = input$fixedEffectItem, randomSlopeItemSigma = input$randSlopeItem,
+    myDataSim(fixedEffectItem = 0, randomSlopeItemSigma = input$randSlopeItem,
               randomInterceptItemSigma = input$randInterItem,
               fixedEffectCondition = input$fixedEffectCond, randomSlopeConditionSigma = input$randSlopeCond,
               randomInterceptConditionSigma = input$randInterCond, errorSigma = input$errorSig,
               randomRhoSlopeInterceptCondition = input$rhoEffectsCondition, 
               randomRhoSlopeInterceptItem = input$rhoEffectsItem, 
               errorSigBetween = 0,
-              nSub = input$nSub, nItem = input$nItem, nCond = input$nCond)
+              nSub = input$nSub, nItem = input$nItem, nCond = 2)
   })
   
   mydatAgg <- reactive({
@@ -122,7 +122,7 @@ server <- function(input, output) {
       rownames(gbfs) <- gsub("id:cond", "cond:id", rownames(gbfs))
     }
     
-    return(data.frame(model = rownames(gbfs), 
+    return(data.frame(Model = rownames(gbfs), 
                       logBF_intercept = gbfs[, 1], 
                       logBF_id = gbfs[, 1] - gbfs["id", 1],
                       logBF_id_cond = gbfs[, 1] - gbfs["id + cond:id", 1]))
@@ -138,7 +138,7 @@ server <- function(input, output) {
                           rscaleFixed = input$fixedPriorAgg , 
                           rscaleRandom = input$randomEffectPriorAgg, 
                           rscaleCont = 1)@bayesFactor
-    return(data.frame(model = rownames(gbfs), 
+    return(data.frame(Model = rownames(gbfs),
                       logBF_intercept = gbfs[, 1], 
                       logBF_id = c(NA, 0, gbfs[-(1:2), 1] - gbfs["id", 1])))
   }, 
@@ -157,7 +157,7 @@ server <- function(input, output) {
       ss <- subset(mydat(), id == i)
       for (j in 1:input$nItem) {
         sss <- subset(ss, item == j)
-        lines(1:input$nCond, sss$y, col = allCols[i], lwd = mylwd)
+        lines(1:2, sss$y, col = allCols[i], lwd = mylwd)
       }
     }
     
@@ -168,7 +168,7 @@ server <- function(input, output) {
     points(as.numeric(mydatAgg()$cond), mydatAgg()$y)
     for (i in 1:input$nSub) {
       ss <- subset(mydatAgg(), id == i)
-      lines(1:input$nCond, tapply(ss$y, ss$cond, mean), col = allCols[i], lwd = mylwd)
+      lines(1:2, tapply(ss$y, ss$cond, mean), col = allCols[i], lwd = mylwd)
     }
     
   })
@@ -239,7 +239,7 @@ ui <- fluidPage (
         ),        
         column(6,
                sliderInput('nSub', '#sub', value = 10, min = 2, max = 100, step = 1),
-               sliderInput('nCond', '#condition', value = 2, min = 2, max = 10, step = 1),
+               # sliderInput('nCond', '#condition', value = 2, min = 2, max = 2, step = 1),
                sliderInput('fixedEffectCond', 'Fixed effect cond', value = 0, min = 0, max = 3, step = 0.1),
                sliderInput('randSlopeCond', 'Random slope cond sigma', value = 0, min = 0, max = 3, step = 0.1),
                sliderInput('randInterCond', 'Random intercept cond sigma', value = 0, min = 0, max = 3, 
@@ -250,7 +250,7 @@ ui <- fluidPage (
         column(6,
                sliderInput('errorSig', 'Error sigma', value = 1, min = 0, max = 10, step = 0.1),
                sliderInput('nItem', '#item', value = 2, min = 1, max = 100, step = 1),
-               sliderInput('fixedEffectItem', 'Fixed effect item', value = 0, min = 0, max = 3, step = 0.1),
+               # sliderInput('fixedEffectItem', 'Fixed effect item', value = 0, min = 0, max = 3, step = 0.1),
                sliderInput('randSlopeItem', 'Random slope item sigma', value = 0, min = 0, max = 3, step = 0.1),
                sliderInput('randInterItem', 'Random intercept item sigma', value = 0, min = 0, max = 3, 
                            step = 0.1),
